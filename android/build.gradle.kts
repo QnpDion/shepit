@@ -13,13 +13,13 @@ subprojects {
     afterEvaluate {
         extensions.findByType(CommonExtension::class.java)?.let {
             it.compileSdk = 36
+            it.compileOptions {
+                sourceCompatibility = JavaVersion.VERSION_17
+                targetCompatibility = JavaVersion.VERSION_17
+            }
         }
         tasks.withType(KotlinCompile::class.java).configureEach {
             compilerOptions.jvmTarget.set(JvmTarget.JVM_17)
-        }
-        tasks.withType(JavaCompile::class.java).configureEach {
-            sourceCompatibility = "17"
-            targetCompatibility = "17"
         }
     }
 }
