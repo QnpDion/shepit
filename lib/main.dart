@@ -287,7 +287,9 @@ class NotificationScheduler {
         card.text,
         when,
         details,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+       uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime
       );
     }
   }
