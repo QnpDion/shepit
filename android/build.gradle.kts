@@ -12,6 +12,15 @@ subprojects {
         extensions.findByType(BaseExtension::class.java)?.let {
             it.compileSdkVersion(36)
         }
+        tasks.configureEach {
+            if (this is org.jetbrains.kotlin.gradle.tasks.KotlinCompile) {
+                kotlinOptions.jvmTarget = "17"
+            }
+            if (this is JavaCompile) {
+                sourceCompatibility = "17"
+                targetCompatibility = "17"
+            }
+        }
     }
 }
 
