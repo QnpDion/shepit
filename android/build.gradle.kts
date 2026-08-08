@@ -1,4 +1,6 @@
-import com.android.build.gradle.BaseExtension
+import com.android.build.api.dsl.CommonExtension
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 allprojects {
     repositories {
@@ -9,17 +11,15 @@ allprojects {
 
 subprojects {
     afterEvaluate {
-        extensions.findByType(BaseExtension::class.java)?.let {
-            it.compileSdkVersion(36)
+        extensions.findByType(CommonExtension::class.java)?.let {
+            it.compileSdk = 36
         }
-        tasks.configureEach {
-            if (this is org.jetbrains.kotlin.gradle.tasks.KotlinCompile) {
-                kotlinOptions.jvmTarget = "17"
-            }
-            if (this is JavaCompile) {
-                sourceCompatibility = "17"
-                targetCompatibility = "17"
-            }
+        tasks.withType(KotlinCompile::class.java).configureEach {
+            compilerOptions.jvmTarget.set(JvmTarget.JVM_17)
+        }
+        tasks.withType(JavaCompile::class.java).configureEach {
+            sourceCompatibility = "17"
+            targetCompatibility = "17"
         }
     }
 }
