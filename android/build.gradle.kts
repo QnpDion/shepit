@@ -1,4 +1,4 @@
-import com.android.build.api.dsl.CommonExtension
+import com.android.build.gradle.BaseExtension
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
@@ -11,9 +11,9 @@ allprojects {
 
 subprojects {
     afterEvaluate {
-        extensions.findByType(CommonExtension::class.java)?.let {
-            it.compileSdk = 36
-            it.compileOptions {
+        extensions.findByType(BaseExtension::class.java)?.let { android ->
+            android.compileSdkVersion(36)
+            android.compileOptions {
                 sourceCompatibility = JavaVersion.VERSION_17
                 targetCompatibility = JavaVersion.VERSION_17
             }
@@ -42,3 +42,4 @@ subprojects {
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }
+EOF
