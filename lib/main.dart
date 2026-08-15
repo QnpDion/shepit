@@ -26,6 +26,10 @@ const _lineDark = Color(0xFF383E5C);
 
 final FlutterLocalNotificationsPlugin _notifications =
     FlutterLocalNotificationsPlugin();
+Future<void>? _notificationInitialization;
+
+Future<void> _ensureNotificationsInitialized() =>
+    _notificationInitialization ??= _initNotifications();
 
 Future<void> _initNotifications() async {
   const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -47,7 +51,7 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
   tz_data.initializeTimeZones();
   runApp(const ShepitApp());
-  _initNotifications();
+  _ensureNotificationsInitialized();
 }
 
 class ShepitApp extends StatefulWidget {
@@ -213,6 +217,12 @@ class AppStrings {
   String get testReminderDescription => isUkrainian
       ? 'Надіслати тихе тестове повідомлення зараз'
       : 'Send a gentle test notification now';
+  String get testReminderSent => isUkrainian
+      ? 'Тестове нагадування надіслано.'
+      : 'Test reminder sent.';
+  String get testReminderBlocked => isUkrainian
+      ? 'Дозвіл на сповіщення не надано. Дозволь сповіщення для Shepit у налаштуваннях Android.'
+      : 'Notification permission is not granted. Allow notifications for Shepit in Android settings.';
   String get randomWhisper => isUkrainian ? 'Випадковий шепіт' : 'Random whisper';
   String get randomDescription => isUkrainian
       ? 'Одна картка з усіх тем — без вибору наперед'
@@ -460,13 +470,28 @@ String _monthYear(String key, String languageCode) {
 class NotificationScheduler {
   static const _baseId = 500;
   static const _daysAhead = 30;
-  static Future<void> requestPermission() async => await _notifications
-      .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-      ?.requestNotificationsPermission();
+  static Future<bool> _hasPermission() async {
+    await _ensureNotificationsInitialized();
+    final android = _notifications
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    if (android == null) return true;
+    return (await android.areNotificationsEnabled()) ?? false;
+  }
+
+  static Future<bool> requestPermission() async {
+    if (await _hasPermission()) return true;
+    final android = _notifications
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    if (android == null) return true;
+    return (await android.requestNotificationsPermission()) ?? false;
+  }
+
   static Future<void> cancelAll() async {
+    await _ensureNotificationsInitialized();
     for (var offset = 0; offset < _daysAhead; offset++) { await _notifications.cancel(_baseId + offset); }
   }
-  static Future<void> scheduleUpcoming(int hour, int minute, AppStrings s) async {
+  static Future<bool> scheduleUpcoming(int hour, int minute, AppStrings s) async {
+    if (!await _hasPermission()) return false;
     await cancelAll();
     final android = AndroidNotificationDetails('shepit_daily', s.notificationChannel,
         channelDescription: s.notificationDescription, importance: Importance.defaultImportance, priority: Priority.defaultPriority);
@@ -480,11 +505,26 @@ class NotificationScheduler {
             uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime);
       }
     }
+    return true;
   }
-  static Future<void> showTestNow(AppStrings s) async {
-    final android = AndroidNotificationDetails('shepit_daily', s.notificationChannel,
-        channelDescription: s.notificationDescription, importance: Importance.defaultImportance, priority: Priority.defaultPriority);
-    await _notifications.show(999, s.notificationTitle, s.notificationBody, NotificationDetails(android: android));
+  static Future<bool> showTestNow(AppStrings s) async {
+    if (!await requestPermission()) return false;
+    final android = AndroidNotificationDetails(
+      'shepit_test',
+      s.testReminder,
+      channelDescription: s.testReminderDescription,
+      importance: Importance.max,
+      priority: Priority.high,
+      enableVibration: true,
+      playSound: true,
+    );
+    try {
+      await _notifications.show(999, s.notificationTitle, s.notificationBody,
+          NotificationDetails(android: android));
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 }
 
@@ -568,7 +608,15 @@ class _HomeShellState extends State<HomeShell> {
   Future<void> _toggleFavorite(HistoryEntry entry) async { setState(() => entry.favorite = !entry.favorite); await _persist(); }
   Future<void> _toggleNotifications(bool enabled) async {
     setState(() => _notificationsEnabled = enabled);
-    if (enabled) { await NotificationScheduler.requestPermission(); await NotificationScheduler.scheduleUpcoming(_notifyHour, _notifyMinute, _strings); }
+    if (enabled) {
+      final allowed = await NotificationScheduler.requestPermission();
+      if (!allowed) {
+        if (mounted) setState(() => _notificationsEnabled = false);
+        await _persist();
+        return;
+      }
+      await NotificationScheduler.scheduleUpcoming(_notifyHour, _notifyMinute, _strings);
+    }
     else { await NotificationScheduler.cancelAll(); }
     await _persist();
   }
@@ -667,7 +715,7 @@ class _ArchiveCard extends StatelessWidget { const _ArchiveCard({required this.e
 
 // ---------- Налаштування ----------
 class _SettingsScreen extends StatelessWidget { const _SettingsScreen({required this.notificationsEnabled,required this.notifyHour,required this.notifyMinute,required this.selectionMode,required this.selectedThemes,required this.darkMode,required this.reducedMotion,required this.textScale,required this.languageMode,required this.onToggleNotifications,required this.onPickTime,required this.onSetSelectionMode,required this.onToggleTheme,required this.onSetDarkMode,required this.onSetReducedMotion,required this.onSetTextScale,required this.onSetLanguageMode});final bool notificationsEnabled,darkMode,reducedMotion;final int notifyHour,notifyMinute;final String selectionMode,textScale,languageMode;final Set<String> selectedThemes;final Future<void> Function(bool) onToggleNotifications,onSetDarkMode,onSetReducedMotion;final Future<void> Function() onPickTime;final Future<void> Function(String) onSetSelectionMode,onToggleTheme,onSetTextScale,onSetLanguageMode;
-  @override Widget build(BuildContext context){final s=AppStrings.of(context);final isDark=Theme.of(context).brightness==Brightness.dark;final fg=Theme.of(context).colorScheme.onSurface;final muted=isDark?_lavender:const Color(0xFF70718A);return SafeArea(child:ListView(padding:const EdgeInsets.fromLTRB(20,18,20,34),children:[Text(s.settings,style:TextStyle(color:fg,fontSize:30,fontWeight:FontWeight.w700)),const SizedBox(height:6),Text(s.settingsIntro,style:TextStyle(color:muted,fontFamily:'sans-serif',height:1.4)),const SizedBox(height:28),_SectionTitle(label:s.language),_SettingsPanel(children:[RadioListTile<String>(value:'system',groupValue:languageMode,onChanged:(v){if(v!=null)onSetLanguageMode(v);},title:Text(s.systemLanguage),subtitle:Text(s.systemLanguageDescription)),const Divider(height:1),RadioListTile<String>(value:'uk',groupValue:languageMode,onChanged:(v){if(v!=null)onSetLanguageMode(v);},title:Text(s.ukrainian),subtitle:Text(s.languageDescription)),const Divider(height:1),RadioListTile<String>(value:'en',groupValue:languageMode,onChanged:(v){if(v!=null)onSetLanguageMode(v);},title:Text(s.english),subtitle:Text(s.languageDescription))]),const SizedBox(height:25),_SectionTitle(label:s.myRhythm),_SettingsPanel(children:[SwitchListTile.adaptive(value:notificationsEnabled,onChanged:onToggleNotifications,secondary:const Icon(Icons.notifications_none_rounded),title:Text(s.reminder),subtitle:Text(s.reminderDescription)),const Divider(height:1),ListTile(enabled:notificationsEnabled,onTap:notificationsEnabled?onPickTime:null,leading:const Icon(Icons.schedule_rounded),title:Text(s.reminderTime),subtitle:Text('${notifyHour.toString().padLeft(2,'0')}:${notifyMinute.toString().padLeft(2,'0')}'),trailing:const Icon(Icons.chevron_right_rounded)),const Divider(height:1),ListTile(leading:const Icon(Icons.send_outlined),title:Text(s.testReminder),subtitle:Text(s.testReminderDescription),onTap:()async{await NotificationScheduler.requestPermission();await NotificationScheduler.showTestNow(s);})]),const SizedBox(height:25),_SectionTitle(label:s.myCards),_SettingsPanel(children:[RadioListTile<String>(value:'random',groupValue:selectionMode,onChanged:(v){if(v!=null)onSetSelectionMode(v);},title:Text(s.randomWhisper),subtitle:Text(s.randomDescription)),const Divider(height:1),RadioListTile<String>(value:'themes',groupValue:selectionMode,onChanged:(v){if(v!=null)onSetSelectionMode(v);},title:Text(s.chosenThemes),subtitle:Text(s.chosenThemesDescription)),if(selectionMode=='themes')... [const Divider(height:1),Padding(padding:const EdgeInsets.fromLTRB(18,16,18,18),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(s.allowedThemes,style:TextStyle(color:fg,fontWeight:FontWeight.w700)),const SizedBox(height:6),Text(selectedThemes.isEmpty?s.noThemes:s.themesSelected,style:TextStyle(color:muted,fontFamily:'sans-serif',fontSize:12,height:1.35)),const SizedBox(height:12),Wrap(spacing:8,runSpacing:8,children:_themeIds.map((id)=>FilterChip(selected:selectedThemes.contains(id),label:Text(s.theme(id)),onSelected:(_)=>onToggleTheme(id))).toList())]))]]),const SizedBox(height:25),_SectionTitle(label:s.mySpace),_SettingsPanel(children:[SwitchListTile.adaptive(value:darkMode,onChanged:onSetDarkMode,secondary:const Icon(Icons.dark_mode_outlined),title:Text(s.darkTheme),subtitle:Text(s.darkThemeDescription)),const Divider(height:1),SwitchListTile.adaptive(value:reducedMotion,onChanged:onSetReducedMotion,secondary:const Icon(Icons.motion_photos_off_outlined),title:Text(s.reduceMotion),subtitle:Text(s.reduceMotionDescription)),const Divider(height:1),Padding(padding:const EdgeInsets.fromLTRB(18,15,18,18),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(s.textSize),const SizedBox(height:10),SegmentedButton<String>(segments:[ButtonSegment(value:'regular',label:Text(s.regular)),ButtonSegment(value:'large',label:Text(s.large))],selected:{textScale},onSelectionChanged:(set){if(set.isNotEmpty)onSetTextScale(set.first);})]))]),const SizedBox(height:25),_SectionTitle(label:s.onHomeScreen),_SettingsPanel(children:[ListTile(leading:const Icon(Icons.widgets_outlined),title:Text(s.widgetTitle),subtitle:Text(s.widgetDescription))]),const SizedBox(height:25),_SectionTitle(label:s.about),_SettingsPanel(children:[ListTile(leading:const Icon(Icons.info_outline_rounded),title:Text(s.appName),subtitle:Text(s.versionDescription))]) ]));}
+  @override Widget build(BuildContext context){final s=AppStrings.of(context);final isDark=Theme.of(context).brightness==Brightness.dark;final fg=Theme.of(context).colorScheme.onSurface;final muted=isDark?_lavender:const Color(0xFF70718A);return SafeArea(child:ListView(padding:const EdgeInsets.fromLTRB(20,18,20,34),children:[Text(s.settings,style:TextStyle(color:fg,fontSize:30,fontWeight:FontWeight.w700)),const SizedBox(height:6),Text(s.settingsIntro,style:TextStyle(color:muted,fontFamily:'sans-serif',height:1.4)),const SizedBox(height:28),_SectionTitle(label:s.language),_SettingsPanel(children:[RadioListTile<String>(value:'system',groupValue:languageMode,onChanged:(v){if(v!=null)onSetLanguageMode(v);},title:Text(s.systemLanguage),subtitle:Text(s.systemLanguageDescription)),const Divider(height:1),RadioListTile<String>(value:'uk',groupValue:languageMode,onChanged:(v){if(v!=null)onSetLanguageMode(v);},title:Text(s.ukrainian),subtitle:Text(s.languageDescription)),const Divider(height:1),RadioListTile<String>(value:'en',groupValue:languageMode,onChanged:(v){if(v!=null)onSetLanguageMode(v);},title:Text(s.english),subtitle:Text(s.languageDescription))]),const SizedBox(height:25),_SectionTitle(label:s.myRhythm),_SettingsPanel(children:[SwitchListTile.adaptive(value:notificationsEnabled,onChanged:onToggleNotifications,secondary:const Icon(Icons.notifications_none_rounded),title:Text(s.reminder),subtitle:Text(s.reminderDescription)),const Divider(height:1),ListTile(enabled:notificationsEnabled,onTap:notificationsEnabled?onPickTime:null,leading:const Icon(Icons.schedule_rounded),title:Text(s.reminderTime),subtitle:Text('${notifyHour.toString().padLeft(2,'0')}:${notifyMinute.toString().padLeft(2,'0')}'),trailing:const Icon(Icons.chevron_right_rounded)),const Divider(height:1),ListTile(leading:const Icon(Icons.send_outlined),title:Text(s.testReminder),subtitle:Text(s.testReminderDescription),onTap:()async{final sent=await NotificationScheduler.showTestNow(s);if(context.mounted){ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(sent?s.testReminderSent:s.testReminderBlocked)));}})]),const SizedBox(height:25),_SectionTitle(label:s.myCards),_SettingsPanel(children:[RadioListTile<String>(value:'random',groupValue:selectionMode,onChanged:(v){if(v!=null)onSetSelectionMode(v);},title:Text(s.randomWhisper),subtitle:Text(s.randomDescription)),const Divider(height:1),RadioListTile<String>(value:'themes',groupValue:selectionMode,onChanged:(v){if(v!=null)onSetSelectionMode(v);},title:Text(s.chosenThemes),subtitle:Text(s.chosenThemesDescription)),if(selectionMode=='themes')... [const Divider(height:1),Padding(padding:const EdgeInsets.fromLTRB(18,16,18,18),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(s.allowedThemes,style:TextStyle(color:fg,fontWeight:FontWeight.w700)),const SizedBox(height:6),Text(selectedThemes.isEmpty?s.noThemes:s.themesSelected,style:TextStyle(color:muted,fontFamily:'sans-serif',fontSize:12,height:1.35)),const SizedBox(height:12),Wrap(spacing:8,runSpacing:8,children:_themeIds.map((id)=>FilterChip(selected:selectedThemes.contains(id),label:Text(s.theme(id)),onSelected:(_)=>onToggleTheme(id))).toList())]))]]),const SizedBox(height:25),_SectionTitle(label:s.mySpace),_SettingsPanel(children:[SwitchListTile.adaptive(value:darkMode,onChanged:onSetDarkMode,secondary:const Icon(Icons.dark_mode_outlined),title:Text(s.darkTheme),subtitle:Text(s.darkThemeDescription)),const Divider(height:1),SwitchListTile.adaptive(value:reducedMotion,onChanged:onSetReducedMotion,secondary:const Icon(Icons.motion_photos_off_outlined),title:Text(s.reduceMotion),subtitle:Text(s.reduceMotionDescription)),const Divider(height:1),Padding(padding:const EdgeInsets.fromLTRB(18,15,18,18),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(s.textSize),const SizedBox(height:10),SegmentedButton<String>(segments:[ButtonSegment(value:'regular',label:Text(s.regular)),ButtonSegment(value:'large',label:Text(s.large))],selected:{textScale},onSelectionChanged:(set){if(set.isNotEmpty)onSetTextScale(set.first);})]))]),const SizedBox(height:25),_SectionTitle(label:s.onHomeScreen),_SettingsPanel(children:[ListTile(leading:const Icon(Icons.widgets_outlined),title:Text(s.widgetTitle),subtitle:Text(s.widgetDescription))]),const SizedBox(height:25),_SectionTitle(label:s.about),_SettingsPanel(children:[ListTile(leading:const Icon(Icons.info_outline_rounded),title:Text(s.appName),subtitle:Text(s.versionDescription))]) ]));}
 }
 class _SectionTitle extends StatelessWidget { const _SectionTitle({required this.label});final String label;@override Widget build(BuildContext context){final isDark=Theme.of(context).brightness==Brightness.dark;return Padding(padding:const EdgeInsets.only(left:4,bottom:9),child:Text(label.toUpperCase(),style:TextStyle(color:isDark?_lavender:const Color(0xFF70718A),fontFamily:'sans-serif',fontSize:11,fontWeight:FontWeight.w700,letterSpacing:1.05)));}}
 class _SettingsPanel extends StatelessWidget { const _SettingsPanel({required this.children});final List<Widget> children;@override Widget build(BuildContext context){final isDark=Theme.of(context).brightness==Brightness.dark;return Container(decoration:BoxDecoration(color:isDark?_nightSurface:_paperSurface,borderRadius:BorderRadius.circular(22),border:Border.all(color:isDark?_lineDark:const Color(0xFFE8DED6))),child:ClipRRect(borderRadius:BorderRadius.circular(22),child:Column(children:children)));}}
