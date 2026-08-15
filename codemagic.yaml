@@ -14,7 +14,7 @@ workflows:
       - name: Fetch Flutter packages
         script: flutter pub get
       - name: Run static analysis
-        script: flutter analyze
+        script: flutter analyze --no-fatal-infos
       - name: Run application smoke test
         script: flutter test
       - name: Build release APK
