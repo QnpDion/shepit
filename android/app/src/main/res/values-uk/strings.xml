@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Шепіт</string>
+    <string name="widget_name">Шепіт дня</string>
+    <string name="daily_whisper">Шепіт дня</string>
+    <string name="widget_hidden_text">Відкрий свій тихий знак.</string>
+    <string name="widget_open">Відкрити шепіт</string>
+</resources>

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/shepit_widget_background"
+    android:gravity="center_vertical"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/widget_kicker"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="ШЕПІТ ДНЯ"
+        android:textColor="#F0BC9B"
+        android:textSize="10sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/widget_text"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:gravity="center_vertical"
+        android:maxLines="3"
+        android:paddingTop="6dp"
+        android:text="Відкрий свій тихий знак."
+        android:textColor="#FFF9F5"
+        android:textSize="16sp" />
+
+    <TextView
+        android:id="@+id/widget_action"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:paddingTop="6dp"
+        android:text="Відкрити шепіт"
+        android:textColor="#B8B5D7"
+        android:textSize="11sp" />
+</LinearLayout>

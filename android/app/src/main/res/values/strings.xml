@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Shepit</string>
+    <string name="widget_name">Daily Whisper</string>
+    <string name="daily_whisper">Daily whisper</string>
+    <string name="widget_hidden_text">Open your quiet sign.</string>
+    <string name="widget_open">Open whisper</string>
+</resources>

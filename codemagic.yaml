@@ -1,13 +1,27 @@
 workflows:
   android-apk:
-    name: Android APK
-    max_build_duration: 30
+    name: Shepit — Android release APK
+    max_build_duration: 60
     environment:
       flutter: stable
+      java: 17
+      cache:
+        cache_paths:
+          - $HOME/.pub-cache
+          - $HOME/.gradle/caches
     scripts:
-      - name: Get packages
+      - name: Verify Flutter and Java toolchain
+        script: |
+          flutter --version
+          java -version
+          flutter doctor -v
+      - name: Fetch Flutter packages
         script: flutter pub get
-      - name: Build APK
+      - name: Run static analysis
+        script: flutter analyze
+      - name: Run application smoke test
+        script: flutter test
+      - name: Build release APK
         script: flutter build apk --release
     artifacts:
-      - build/app/outputs/flutter-apk/*.apk
+      - build/**/outputs/flutter-apk/*.apk
