@@ -5,10 +5,6 @@ workflows:
     environment:
       flutter: stable
       java: 17
-      cache:
-        cache_paths:
-          - $HOME/.pub-cache
-          - $HOME/.gradle/caches
     scripts:
       - name: Verify Flutter and Java toolchain
         script: |
