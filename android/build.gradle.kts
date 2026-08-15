@@ -1,26 +1,7 @@
-import com.android.build.gradle.BaseExtension
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-
 allprojects {
     repositories {
         google()
         mavenCentral()
-    }
-}
-
-subprojects {
-    afterEvaluate {
-        extensions.findByType(BaseExtension::class.java)?.let { android ->
-            android.compileSdkVersion(36)
-            android.compileOptions {
-                sourceCompatibility = JavaVersion.VERSION_17
-                targetCompatibility = JavaVersion.VERSION_17
-            }
-        }
-        tasks.withType(KotlinCompile::class.java).configureEach {
-            compilerOptions.jvmTarget.set(JvmTarget.JVM_17)
-        }
     }
 }
 
@@ -42,3 +23,4 @@ subprojects {
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }
+EOF
