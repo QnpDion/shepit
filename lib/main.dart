@@ -29,19 +29,25 @@ final FlutterLocalNotificationsPlugin _notifications =
 
 Future<void> _initNotifications() async {
   const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-  await _notifications.initialize(const InitializationSettings(android: androidInit));
-  tz_data.initializeTimeZones();
   try {
-    tz.setLocalLocation(tz.getLocation(await FlutterTimezone.getLocalTimezone()));
+    await _notifications
+        .initialize(const InitializationSettings(android: androidInit))
+        .timeout(const Duration(seconds: 4));
+  } catch (_) {}
+  try {
+    final timeZone = await FlutterTimezone.getLocalTimezone()
+        .timeout(const Duration(seconds: 4));
+    tz.setLocalLocation(tz.getLocation(timeZone));
   } catch (_) {
     tz.setLocalLocation(tz.getLocation('Europe/Kyiv'));
   }
 }
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  await _initNotifications();
+  tz_data.initializeTimeZones();
   runApp(const ShepitApp());
+  _initNotifications();
 }
 
 class ShepitApp extends StatefulWidget {
@@ -399,8 +405,10 @@ class HistoryEntry {
 }
 
 class ShepitStorage {
+  static const _timeout = Duration(seconds: 3);
+
   static Future<File> _file() async {
-    final dir = await getApplicationDocumentsDirectory();
+    final dir = await getApplicationDocumentsDirectory().timeout(_timeout);
     return File('${dir.path}/shepit_data.json');
   }
 
@@ -414,7 +422,10 @@ class ShepitStorage {
   static Future<Map<String, dynamic>> load() async {
     try {
       final file = await _file();
-      if (await file.exists()) return Map<String, dynamic>.from(jsonDecode(await file.readAsString()) as Map);
+      if (await file.exists().timeout(_timeout)) {
+        final raw = await file.readAsString().timeout(_timeout);
+        return Map<String, dynamic>.from(jsonDecode(raw) as Map);
+      }
     } catch (_) {}
     return _defaults();
   }
@@ -422,7 +433,7 @@ class ShepitStorage {
   static Future<void> save(Map<String, dynamic> data) async {
     try {
       final file = await _file();
-      await file.writeAsString(jsonEncode(data));
+      await file.writeAsString(jsonEncode(data)).timeout(_timeout);
     } catch (_) {}
   }
 }
